@@ -1,6 +1,6 @@
 {
   "name": "@superbet-group/shared.redux-dynamic-modules",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Dynamic module loading for your Redux application",
   "repository": {
     "type": "git",
