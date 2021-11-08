@@ -17,8 +17,8 @@ jobs:
         with:
           node-version: 16.13.0
 
-      - name: Install dependencies
+        name: Install dependencies
       - run: npm ci
 
-      - name: Run Tests
+        name: Run Tests
       - run: npm test
