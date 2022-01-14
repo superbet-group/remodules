@@ -1,3 +1,5 @@
+![remodules logo](/logo.svg "a red lightning with 2 atoms chasing each other around it")
+
 # `remodules` - Dynamic Module Loading for Your Redux Application
 
 ## Installation
