@@ -1,24 +1,24 @@
 import {
-  Action,
-  AnyAction,
+  type Action,
+  type AnyAction,
   combineReducers,
   configureStore,
-  ConfigureStoreOptions,
+  type ConfigureStoreOptions,
   createAction,
   createSelector,
   createSlice,
-  CreateSliceOptions,
-  EnhancedStore,
-  Middleware,
-  Reducer,
-  Slice,
-  SliceCaseReducers,
-  Store,
+  type CreateSliceOptions,
+  type EnhancedStore,
+  type Middleware,
+  type Reducer,
+  type Slice,
+  type SliceCaseReducers,
+  type Store,
 } from "@reduxjs/toolkit";
-import { ThunkMiddlewareFor } from "@reduxjs/toolkit/dist/getDefaultMiddleware";
+import { type ThunkMiddlewareFor } from "@reduxjs/toolkit/dist/getDefaultMiddleware";
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "react-redux";
-import createSagaMiddleware, { Task } from "redux-saga";
+import createSagaMiddleware, { type Task } from "redux-saga";
 
 export type SelectorsShape<State> = { [key: string]: (state: State) => any };
 
@@ -28,20 +28,20 @@ export type ModuleConfig<
   Selectors extends SelectorsShape<State>,
   Watcher extends () => Generator,
   Name extends string = string
-> = {
-  watcher?: Watcher;
-  selectors?: Selectors;
-} & CreateSliceOptions<State, CaseReducers, Name>;
+  > = {
+    watcher?: Watcher;
+    selectors?: Selectors;
+  } & CreateSliceOptions<State, CaseReducers, Name>;
 
 type FinalSelectors<
   State = any,
   Name extends string = string,
   Selectors extends SelectorsShape<State> = {}
-> = {
-  [key in keyof Selectors]: (state: { [key in Name]: State }) => ReturnType<
-    Selectors[key]
-  >;
-};
+  > = {
+    [key in keyof Selectors]: (state: { [key in Name]: State }) => ReturnType<
+      Selectors[key]
+    >;
+  };
 
 export type Module<
   State = any,
@@ -49,10 +49,10 @@ export type Module<
   Selectors extends SelectorsShape<State> = {},
   Watcher extends () => Generator = () => Generator,
   Name extends string = string
-> = Slice<State, CaseReducers, Name> & {
-  watcher: Watcher;
-  selectors: FinalSelectors<State, Name, Selectors>;
-};
+  > = Slice<State, CaseReducers, Name> & {
+    watcher: Watcher;
+    selectors: FinalSelectors<State, Name, Selectors>;
+  };
 
 export const createModule = <
   State,
@@ -87,10 +87,10 @@ export type DynamicStore<
   MiddlewareType extends ReadonlyArray<Middleware<{}, State>> = [
     ThunkMiddlewareFor<State>
   ]
-> = EnhancedStore<State, ActionType, MiddlewareType> & {
-  addModule: (module: Module) => void;
-  removeModule: (module: Module) => void;
-};
+  > = EnhancedStore<State, ActionType, MiddlewareType> & {
+    addModule: (module: Module) => void;
+    removeModule: (module: Module) => void;
+  };
 
 const isObject = (candidate: unknown): candidate is object => {
   return typeof candidate === "object" && candidate !== null;
@@ -102,11 +102,11 @@ type CreateDynamicStoreOptions<
   MiddlewareType extends ReadonlyArray<Middleware<{}, State>> = [
     ThunkMiddlewareFor<State>
   ]
-> = { rootSaga?: () => Generator } & ConfigureStoreOptions<
-  State,
-  ActionType,
-  MiddlewareType
->;
+  > = { rootSaga?: () => Generator } & ConfigureStoreOptions<
+    State,
+    ActionType,
+    MiddlewareType
+  >;
 
 const moduleAdded = createAction<string>("@@MODULE/ADDED");
 const moduleRemoved = createAction<string>("@@MODULE/REMOVED");
