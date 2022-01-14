@@ -6,6 +6,14 @@
     "type": "git",
     "url": "ssh://github.com/superbet-group/shared.redux-dynamic-modules.git"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "logo.svg",
+    "CODE_OF_CONDUCT.md",
+    "LICENSE",
+    "CONTRIBUTING.md"
+  ],
   "publishConfig": {
     "registry": "https://registry.npmjs.org",
     "tag": "latest",
