@@ -20,7 +20,7 @@ jobs:
       - run: npm run build
 
       - name: Release
-      - uses: cycjimmy/semantic-release-action@v2
+        uses: cycjimmy/semantic-release-action@v2
         with:
           extra_plugins: |
             @semantic-release/git
