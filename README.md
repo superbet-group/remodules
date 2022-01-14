@@ -1,9 +1,9 @@
-# `@superbet-group/shared.redux-dynamic-modules` - dynamic module loading for your Redux application
+# `remodules` - Dynamic Module Loading for Your Redux Application
 
 ## Installation
 
 ```bash
-npm install --save @superbet-group/shared.redux-dynamic-modules
+npm install --save remodules
 ```
 
 ## Add Peer Dependencies
@@ -15,12 +15,7 @@ npm install --save @reduxjs/toolkit redux-saga # react redux react-redux
 ## Usage
 
 ```tsx
-import { applyMiddleware } from "redux";
-import {
-  createDynamicStore,
-  createModule,
-  useModule,
-} from "@superbet-group/shared.redux-dynamic-modules";
+import { createDynamicStore, createModule, useModule } from "remodules";
 import { Provider, useDispatch } from "react-redux";
 
 const counterModule = createModule({
