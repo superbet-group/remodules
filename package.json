@@ -33,6 +33,7 @@
   "exports": "./dist/index.modern.js",
   "main": "./dist/index.cjs",
   "module": "./dist/index.module.js",
+  "types": "./dist/index.d.ts",
   "unpkg": "./dist/index.umd.js",
   "scripts": {
     "build": "microbundle",
