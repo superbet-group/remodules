@@ -72,6 +72,86 @@ const App = () => {
 };
 ```
 
+## Usage with Redux-Saga
+
+By convention, Sagas are named _"watchers"_ as they keep running for the lifecycle of the module (unless interrupted from within themselves).
+
+You can attach a watcher to the module by using the `withWatcher` method on the store.
+
+> NOTE: this returns a copy of the old module, with the watcher attached instead of it being applied to the original module.
+
+`withWatcher` accepts a function with a single argument which is the `actions` object of the module and should return a generator function, which will run as the watcher.
+
+```ts
+const counterModule = createModule({
+  name: "counter",
+  initialState: {
+    count: 0,
+  },
+  actions: {
+    increment: (state, payload) => ({
+      ...state,
+      count: state.count + payload,
+    }),
+    decrement: (state, payload) => ({
+      ...state,
+      count: state.count - payload,
+    }),
+    boom: () => {},
+  },
+  selectors: {
+    count: (state) => state.count,
+  },
+}).withWatcher((actions) => {
+  return function* watcher() {
+    while (true) {
+      yield take(actions.boom);
+      yield put(actions.increment(Math.floor(Math.random() * 10)));
+    }
+  };
+});
+```
+
+## When the Module is Removed
+
+Before the module gets removed from the store, you have a chance to perform cleanup via the watcher. You can technically also handle cleanup in the `extraReducers` of the module, but the resulting state will never be rendered and side-effects are discouraged from reducers.
+
+```ts
+import { createModule, moduleRemoved } from "remodules";
+
+const explodeOnUnmountModule = createModule({
+  name: "explodeOnUnmount",
+  initialState: {
+    count: 0,
+  },
+  actions: {
+    increment: (state, payload) => ({
+      ...state,
+      count: state.count + payload,
+    }),
+    decrement: (state, payload) => ({
+      ...state,
+      count: state.count - payload,
+    }),
+  },
+  selectors: {
+    count: (state) => state.count,
+  },
+}).withWatcher((actions) => {
+  return function* watcher() {
+    while (true) {
+      yield take(
+        (action) =>
+          moduleRemoved.match(action) && action.payload === "explodeOnUnmount"
+      );
+      yield call(triggerExplosion);
+    }
+  };
+});
+```
+
+> NOTE: your saga task will be cancelled right after this, synchronously.
+
 ## Motivation
 
 There are numerous use cases for dynamic module loading in Redux applications. For example:
