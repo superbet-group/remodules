@@ -1,11 +1,13 @@
 import * as React from "react";
-import { useReducer } from "react";
-import { createStore, PayloadAction } from "@reduxjs/toolkit";
-import { Provider, useSelector } from "react-redux";
+import { useCallback, useReducer } from "react";
+import { AnyAction, createStore, PayloadAction } from "@reduxjs/toolkit";
+import { Provider, useDispatch, useSelector } from "react-redux";
 import { put, take } from "redux-saga/effects";
 import { fireEvent, render } from "@testing-library/react";
 
-import { createDynamicStore, createModule, useModule } from ".";
+import "@testing-library/jest-dom";
+
+import { createDynamicStore, createModule, moduleRemoved, useModule } from ".";
 
 const testModule = createModule({
   name: "test",
@@ -18,16 +20,17 @@ const testModule = createModule({
       state.value += 1;
     },
   },
-  *watcher() {
-    while (true) {
-      yield take(testModule.actions.boom.type);
-      yield put(testModule.actions.increment());
-    }
-  },
   selectors: {
     value: (state) => state.value,
     valueTimes10: (state) => state.value * 10,
   },
+}).withWatcher((actions) => {
+  return function* watcher() {
+    while (true) {
+      yield take(actions.boom.type);
+      yield put(actions.increment());
+    }
+  };
 });
 
 testModule.actions.increment();
@@ -67,11 +70,18 @@ const anotherTestModule = createModule({
       state.temperature += 1;
     },
   },
-  *watcher() {
+  selectors: {
+    temperature: (state) => state.temperature,
+    humidity: (state) => state.humidity,
+    wind: (state) => state.wind,
+    rain: (state) => state.rain,
+  },
+}).withWatcher((actions) => {
+  return function* watcher() {
     while (true) {
-      yield take(anotherTestModule.actions.loadData.type);
+      yield take(actions.loadData.type);
       yield put(
-        anotherTestModule.actions.dataLoaded({
+        actions.dataLoaded({
           temperature: 1,
           humidity: 2,
           wind: 3,
@@ -79,13 +89,7 @@ const anotherTestModule = createModule({
         })
       );
     }
-  },
-  selectors: {
-    temperature: (state) => state.temperature,
-    humidity: (state) => state.humidity,
-    wind: (state) => state.wind,
-    rain: (state) => state.rain,
-  },
+  };
 });
 
 const TestComponent = () => {
@@ -122,6 +126,43 @@ const StoreKeys = () => {
   return <div data-testid="storeKeys">{keys.join(", ")}</div>;
 };
 
+const moduleWithoutWatcher = createModule({
+  name: "moduleWithoutWatcher",
+  initialState: {
+    json: {},
+  },
+  reducers: {
+    jsonLoaded: (state, action: PayloadAction<Record<string, any>>) => {
+      state.json = action.payload;
+    },
+  },
+  selectors: {
+    json: (state) => state.json,
+  },
+});
+
+const ModuleWithoutWatcherComponent = () => {
+  useModule(moduleWithoutWatcher);
+  const dispatch = useDispatch();
+
+  const json = useSelector(moduleWithoutWatcher.selectors.json);
+
+  const onButtonPress = useCallback(() => {
+    dispatch(
+      moduleWithoutWatcher.actions.jsonLoaded({
+        test: 1,
+      })
+    );
+  }, []);
+
+  return (
+    <>
+      <div data-testid="json">{JSON.stringify(json)}</div>
+      <button onClick={onButtonPress}>Click me</button>
+    </>
+  );
+};
+
 describe("redux dynamic modules", () => {
   it("should be able to initialise modules", () => {
     const store = createDynamicStore({
@@ -141,6 +182,30 @@ describe("redux dynamic modules", () => {
 
     expect(getByText("Test: 0, 0")).toBeTruthy();
     expect(getByText("AnotherTest: 0, 0, 0, 0")).toBeTruthy();
+  });
+
+  it("should be able to initialise module without watcher", () => {
+    const store = createDynamicStore({
+      reducer: (state = {}) => state,
+    });
+
+    const TestApp = () => {
+      return (
+        <Provider store={store}>
+          <ModuleWithoutWatcherComponent />
+        </Provider>
+      );
+    };
+
+    const { getByText, getByTestId } = render(<TestApp />);
+
+    const button = getByText("Click me");
+    const json = getByTestId("json");
+
+    expect(json).toHaveTextContent("{}");
+    fireEvent.click(button);
+
+    expect(json).toHaveTextContent('{"test":1}');
   });
 
   it("should be able to initialise modules on demand", () => {
@@ -170,6 +235,42 @@ describe("redux dynamic modules", () => {
     fireEvent.click(mountButton);
 
     expect(store.getState().test).toBeDefined();
+  });
+
+  it("should be able to keep track of modules between re-renders", () => {
+    const store = createDynamicStore({
+      reducer: (state = {}) => state,
+    });
+
+    const TestApp = () => {
+      const [value, toggle] = useReducer((current) => !current, false);
+
+      return (
+        <Provider store={store}>
+          {value && <div>true</div>}
+          <button data-testid="toggle" onClick={toggle}>
+            Toggle
+          </button>
+          <AnotherTestComponent />
+          <StoreKeys />
+        </Provider>
+      );
+    };
+
+    const { getByTestId } = render(<TestApp />);
+
+    const toggleButton = getByTestId("toggle");
+    const storeKeys = getByTestId("storeKeys");
+
+    expect(storeKeys).toHaveTextContent("anotherTest");
+
+    fireEvent.click(toggleButton);
+
+    expect(storeKeys).toHaveTextContent("anotherTest");
+
+    fireEvent.click(toggleButton);
+
+    expect(storeKeys).toHaveTextContent("anotherTest");
   });
 
   it("should be able to remove the module when initialising component unmounts", () => {
@@ -334,6 +435,66 @@ describe("redux dynamic modules", () => {
     });
 
     expect(capture).toHaveBeenCalled();
+  });
+
+  it("allows handling removal event in saga", () => {
+    const testCaller = jest.fn();
+    const testModule = createModule({
+      name: "test",
+      initialState: {
+        value: "test-0",
+      },
+      reducers: {
+        update: (state) => {
+          state.value += 1;
+        },
+      },
+      selectors: {
+        value: (state) => state.value,
+      },
+    }).withWatcher(() => {
+      return function* watcher() {
+        while (true) {
+          yield take(
+            (action: AnyAction) =>
+              moduleRemoved.match(action) && action.payload === "test"
+          );
+          testCaller();
+        }
+      };
+    });
+
+    const store = createDynamicStore({
+      reducer: (state = {}) => state,
+    });
+
+    const TestComponent = () => {
+      useModule(testModule);
+
+      return <div />;
+    };
+
+    const TestApp = () => {
+      const [mounted, mount] = useReducer(() => false, true);
+      return (
+        <Provider store={store}>
+          {mounted && <TestComponent />}
+          <button data-testid="unmount" onClick={mount}>
+            Unmount
+          </button>
+        </Provider>
+      );
+    };
+
+    const { getByTestId } = render(<TestApp />);
+
+    const unmountButton = getByTestId("unmount");
+
+    expect(testCaller).not.toHaveBeenCalled();
+
+    fireEvent.click(unmountButton);
+
+    expect(testCaller).toHaveBeenCalledTimes(1);
   });
 
   describe("exports useModule hook that", () => {
