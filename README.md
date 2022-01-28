@@ -80,7 +80,7 @@ You can attach a watcher to the module by using the `withWatcher` method on the 
 
 > NOTE: this returns a copy of the old module, with the watcher attached instead of it being applied to the original module.
 
-`withWatcher` accepts a function with a single argument which is the `actions` object of the module and should return a generator function, which will run as the watcher.
+`withWatcher` accepts a function with a single argument which is the `module` created by `createModule` (with the exception of `withWatcher` method itself) and should return a generator function, which will run as the watcher.
 
 ```ts
 const counterModule = createModule({
@@ -102,11 +102,12 @@ const counterModule = createModule({
   selectors: {
     count: (state) => state.count,
   },
-}).withWatcher((actions) => {
+}).withWatcher(({ actions, selectors }) => {
   return function* watcher() {
     while (true) {
       yield take(actions.boom);
-      yield put(actions.increment(Math.floor(Math.random() * 10)));
+      const count = yield select(selectors.count);
+      yield put(actions.increment(Math.floor(Math.random() * count)));
     }
   };
 });
@@ -137,7 +138,7 @@ const explodeOnUnmountModule = createModule({
   selectors: {
     count: (state) => state.count,
   },
-}).withWatcher((actions) => {
+}).withWatcher(({ actions }) => {
   return function* watcher() {
     while (true) {
       yield take(
