@@ -24,7 +24,7 @@ const testModule = createModule({
     value: (state) => state.value,
     valueTimes10: (state) => state.value * 10,
   },
-}).withWatcher((actions) => {
+}).withWatcher(({ actions }) => {
   return function* watcher() {
     while (true) {
       yield take(actions.boom.type);
@@ -76,7 +76,7 @@ const anotherTestModule = createModule({
     wind: (state) => state.wind,
     rain: (state) => state.rain,
   },
-}).withWatcher((actions) => {
+}).withWatcher(({ actions }) => {
   return function* watcher() {
     while (true) {
       yield take(actions.loadData.type);

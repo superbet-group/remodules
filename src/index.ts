@@ -14,7 +14,6 @@ import {
   type Slice,
   type SliceCaseReducers,
   type Store,
-  type CaseReducerActions,
 } from "@reduxjs/toolkit";
 import { type ThunkMiddlewareFor } from "@reduxjs/toolkit/dist/getDefaultMiddleware";
 import { useEffect, useRef, useState } from "react";
@@ -47,10 +46,9 @@ export type Module<
   CaseReducers extends SliceCaseReducers<State> = SliceCaseReducers<State>,
   Selectors extends SelectorsShape<State> = {},
   Name extends string = string,
-  ModuleSlice = Slice<State, CaseReducers, Name>
+  ModuleSlice = Slice<State, CaseReducers, Name> & { selectors: FinalSelectors<State, Name, Selectors>; }
   > = ModuleSlice & {
-    selectors: FinalSelectors<State, Name, Selectors>;
-    withWatcher<Watcher extends () => Generator>(createWatcher: (action: CaseReducerActions<CaseReducers>) => Watcher): ModuleWithWatcher<
+    withWatcher<Watcher extends () => Generator>(createWatcher: (action: ModuleSlice) => Watcher): ModuleWithWatcher<
       State,
       CaseReducers,
       Selectors,
@@ -91,9 +89,12 @@ export const createModule = <
     {} as FinalSelectors<State, Name, Selectors>
   );
 
+  const moduleSlice = { ...slice, selectors };
+
   return {
-    ...slice, selectors, withWatcher(createWatcher) {
-      const watcher = createWatcher(slice.actions);
+    ...moduleSlice,
+    withWatcher(createWatcher) {
+      const watcher = createWatcher(moduleSlice);
       return { ...this, watcher };
     }
   };
