@@ -539,4 +539,14 @@ describe("redux dynamic modules", () => {
       );
     });
   });
+
+  it("createModule does not throw an error when selectors is not provided", () => {
+    expect(() =>
+      createModule({
+        name: "testModule",
+        initialState: {},
+        reducers: {},
+      })
+    ).not.toThrow();
+  });
 });
