@@ -16,7 +16,7 @@ import {
   type Store,
 } from "@reduxjs/toolkit";
 import { type ThunkMiddlewareFor } from "@reduxjs/toolkit/dist/getDefaultMiddleware";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useStore } from "react-redux";
 import createSagaMiddleware, { type Task } from "redux-saga";
 
@@ -27,34 +27,33 @@ export type ModuleConfig<
   CaseReducers extends SliceCaseReducers<State>,
   Selectors extends SelectorsShape<State>,
   Name extends string = string
-  > = {
-    selectors?: Selectors;
-  } & CreateSliceOptions<State, CaseReducers, Name>;
+> = {
+  selectors?: Selectors;
+} & CreateSliceOptions<State, CaseReducers, Name>;
 
 type FinalSelectors<
   State = any,
   Name extends string = string,
   Selectors extends SelectorsShape<State> = {}
-  > = {
-    [key in keyof Selectors]: (state: { [key in Name]: State }) => ReturnType<
-      Selectors[key]
-    >;
-  };
+> = {
+  [key in keyof Selectors]: (state: { [key in Name]: State }) => ReturnType<
+    Selectors[key]
+  >;
+};
 
 export type Module<
   State = any,
   CaseReducers extends SliceCaseReducers<State> = SliceCaseReducers<State>,
   Selectors extends SelectorsShape<State> = {},
   Name extends string = string,
-  ModuleSlice = Slice<State, CaseReducers, Name> & { selectors: FinalSelectors<State, Name, Selectors>; }
-  > = ModuleSlice & {
-    withWatcher<Watcher extends () => Generator>(createWatcher: (action: ModuleSlice) => Watcher): ModuleWithWatcher<
-      State,
-      CaseReducers,
-      Selectors,
-      Watcher,
-      Name>;
-  };
+  ModuleSlice = Slice<State, CaseReducers, Name> & {
+    selectors: FinalSelectors<State, Name, Selectors>;
+  }
+> = ModuleSlice & {
+  withWatcher<Watcher extends () => Generator>(
+    createWatcher: (action: ModuleSlice) => Watcher
+  ): ModuleWithWatcher<State, CaseReducers, Selectors, Watcher, Name>;
+};
 
 export type ModuleWithWatcher<
   State = any,
@@ -62,9 +61,9 @@ export type ModuleWithWatcher<
   Selectors extends SelectorsShape<State> = {},
   Watcher extends () => Generator = () => Generator,
   Name extends string = string
-  > = Module<State, CaseReducers, Selectors, Name> & {
-    watcher?: Watcher;
-  }
+> = Module<State, CaseReducers, Selectors, Name> & {
+  watcher?: Watcher;
+};
 
 export const createModule = <
   State,
@@ -81,7 +80,7 @@ export const createModule = <
     return state[slice.name];
   };
 
-  const selectors = Object.entries(sliceSelectors).reduce(
+  const selectors = Object.entries(sliceSelectors || {}).reduce(
     (acc, [key, selector]) => ({
       ...acc,
       [key]: createSelector(rootSelector, selector),
@@ -96,7 +95,7 @@ export const createModule = <
     withWatcher(createWatcher) {
       const watcher = createWatcher(moduleSlice);
       return { ...this, watcher };
-    }
+    },
   };
 };
 
@@ -106,10 +105,10 @@ export type DynamicStore<
   MiddlewareType extends ReadonlyArray<Middleware<{}, State>> = [
     ThunkMiddlewareFor<State>
   ]
-  > = EnhancedStore<State, ActionType, MiddlewareType> & {
-    addModule: (module: ModuleWithWatcher) => void;
-    removeModule: (module: ModuleWithWatcher) => void;
-  };
+> = EnhancedStore<State, ActionType, MiddlewareType> & {
+  addModule: (module: ModuleWithWatcher) => void;
+  removeModule: (module: ModuleWithWatcher) => void;
+};
 
 const isObject = (candidate: unknown): candidate is object => {
   return typeof candidate === "object" && candidate !== null;
@@ -121,11 +120,11 @@ type CreateDynamicStoreOptions<
   MiddlewareType extends ReadonlyArray<Middleware<{}, State>> = [
     ThunkMiddlewareFor<State>
   ]
-  > = { rootSaga?: () => Generator } & ConfigureStoreOptions<
-    State,
-    ActionType,
-    MiddlewareType
-  >;
+> = { rootSaga?: () => Generator } & ConfigureStoreOptions<
+  State,
+  ActionType,
+  MiddlewareType
+>;
 
 export const moduleAdded = createAction<string>("@@MODULE/ADDED");
 export const moduleRemoved = createAction<string>("@@MODULE/REMOVED");
@@ -299,19 +298,17 @@ export const useModule = (dynamicModule: ModuleWithWatcher) => {
     );
   }
   const store = useDynamicStore();
-  const previousModule = useRef<ModuleWithWatcher>(dynamicModule);
+  const previousModule = useRef<ModuleWithWatcher>(null);
 
   const { addModule, removeModule } = store;
 
   // We avoid using `useEffect` on purpose as we need the module to be available directly on mount
   // so that `useSelector` can be used without needing to worry about `undefined` states
-  useState(() => {
-    addModule(dynamicModule);
-  });
-
   // Handle the case when for some reason the `dynamicModule` parameter gets updated
   if (dynamicModule !== previousModule.current) {
-    removeModule(previousModule.current);
+    if (previousModule.current) {
+      removeModule(previousModule.current);
+    }
     addModule(dynamicModule);
     previousModule.current = dynamicModule;
   }
