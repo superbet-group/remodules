@@ -26,10 +26,8 @@ export type ModuleConfig<
   State,
   CaseReducers extends SliceCaseReducers<State>,
   Selectors extends SelectorsShape<State>,
-  Watcher extends () => Generator,
   Name extends string = string
   > = {
-    watcher?: Watcher;
     selectors?: Selectors;
   } & CreateSliceOptions<State, CaseReducers, Name>;
 
@@ -47,23 +45,36 @@ export type Module<
   State = any,
   CaseReducers extends SliceCaseReducers<State> = SliceCaseReducers<State>,
   Selectors extends SelectorsShape<State> = {},
+  Name extends string = string,
+  ModuleSlice = Slice<State, CaseReducers, Name> & { selectors: FinalSelectors<State, Name, Selectors>; }
+  > = ModuleSlice & {
+    withWatcher<Watcher extends () => Generator>(createWatcher: (action: ModuleSlice) => Watcher): ModuleWithWatcher<
+      State,
+      CaseReducers,
+      Selectors,
+      Watcher,
+      Name>;
+  };
+
+export type ModuleWithWatcher<
+  State = any,
+  CaseReducers extends SliceCaseReducers<State> = SliceCaseReducers<State>,
+  Selectors extends SelectorsShape<State> = {},
   Watcher extends () => Generator = () => Generator,
   Name extends string = string
-  > = Slice<State, CaseReducers, Name> & {
-    watcher: Watcher;
-    selectors: FinalSelectors<State, Name, Selectors>;
-  };
+  > = Module<State, CaseReducers, Selectors, Name> & {
+    watcher?: Watcher;
+  }
 
 export const createModule = <
   State,
   CaseReducers extends SliceCaseReducers<State>,
   Selectors extends SelectorsShape<State>,
-  Watcher extends () => Generator,
   Name extends string = string
 >(
-  config: ModuleConfig<State, CaseReducers, Selectors, Watcher, Name>
-): Module<State, CaseReducers, Selectors, Watcher, Name> => {
-  const { watcher, selectors: sliceSelectors, ...sliceConfig } = config;
+  config: ModuleConfig<State, CaseReducers, Selectors, Name>
+): Module<State, CaseReducers, Selectors, Name> => {
+  const { selectors: sliceSelectors, ...sliceConfig } = config;
 
   const slice = createSlice(sliceConfig);
   const rootSelector = (state: { [key in Name]: State }) => {
@@ -78,7 +89,15 @@ export const createModule = <
     {} as FinalSelectors<State, Name, Selectors>
   );
 
-  return { ...slice, watcher, selectors };
+  const moduleSlice = { ...slice, selectors };
+
+  return {
+    ...moduleSlice,
+    withWatcher(createWatcher) {
+      const watcher = createWatcher(moduleSlice);
+      return { ...this, watcher };
+    }
+  };
 };
 
 export type DynamicStore<
@@ -88,8 +107,8 @@ export type DynamicStore<
     ThunkMiddlewareFor<State>
   ]
   > = EnhancedStore<State, ActionType, MiddlewareType> & {
-    addModule: (module: Module) => void;
-    removeModule: (module: Module) => void;
+    addModule: (module: ModuleWithWatcher) => void;
+    removeModule: (module: ModuleWithWatcher) => void;
   };
 
 const isObject = (candidate: unknown): candidate is object => {
@@ -108,8 +127,19 @@ type CreateDynamicStoreOptions<
     MiddlewareType
   >;
 
-const moduleAdded = createAction<string>("@@MODULE/ADDED");
-const moduleRemoved = createAction<string>("@@MODULE/REMOVED");
+export const moduleAdded = createAction<string>("@@MODULE/ADDED");
+export const moduleRemoved = createAction<string>("@@MODULE/REMOVED");
+
+const baseReducer = (state: any, action: AnyAction) => {
+  switch (action.type) {
+    case moduleRemoved.type:
+      const { payload: moduleName } = action;
+      const { [moduleName]: removedModule, ...rest } = state;
+      return rest;
+    default:
+      return state;
+  }
+};
 
 export const createDynamicStore = <
   State = any,
@@ -141,8 +171,12 @@ export const createDynamicStore = <
 
   const sagaMiddleware = createSagaMiddleware();
 
+  const originalReducerWithBase = (state: State, action: ActionType) => {
+    return baseReducer(originalReducer(state, action), action);
+  };
+
   const store = configureStore<State, ActionType, MiddlewareType>({
-    reducer: originalReducer,
+    reducer: originalReducerWithBase,
     middleware: (getDefaultMiddleware) => {
       let modifiedMiddleware = [] as unknown as MiddlewareType;
       if (typeof middleware === "function") {
@@ -163,6 +197,10 @@ export const createDynamicStore = <
   }
 
   const updateReducer = () => {
+    if (moduleCount.size === 0) {
+      store.replaceReducer(originalReducerWithBase);
+      return;
+    }
     const moduleReducers = {};
     for (const { name, reducer } of moduleCount.keys()) {
       moduleReducers[name] = reducer;
@@ -171,12 +209,12 @@ export const createDynamicStore = <
       moduleReducers
     ) as unknown as Reducer<State>;
     const combinedReducer = (state, action) => {
-      return originalReducer(newModuleReducer(state, action), action);
+      return originalReducerWithBase(newModuleReducer(state, action), action);
     };
     store.replaceReducer(combinedReducer);
   };
 
-  const moduleCount = new Map<Module, number>();
+  const moduleCount = new Map<ModuleWithWatcher, number>();
 
   const sagaToTask = new Map<() => Generator, Task>();
 
@@ -198,7 +236,7 @@ export const createDynamicStore = <
     sagaToTask.delete(saga);
   };
 
-  const addModule = (newModule: Module) => {
+  const addModule = (newModule: ModuleWithWatcher) => {
     const count = moduleCount.get(newModule);
     if (count !== undefined) {
       moduleCount.set(newModule, count + 1);
@@ -212,18 +250,18 @@ export const createDynamicStore = <
     store.dispatch(moduleAdded(newModule.name) as any);
   };
 
-  const removeModule = (oldModule: Module) => {
+  const removeModule = (oldModule: ModuleWithWatcher) => {
     const count = moduleCount.get(oldModule);
     if (count !== 1) {
       moduleCount.set(oldModule, count - 1);
       return;
     }
+    store.dispatch(moduleRemoved(oldModule.name) as any);
     moduleCount.delete(oldModule);
     if (oldModule.watcher) {
       removeSaga(oldModule.watcher);
     }
     updateReducer();
-    store.dispatch(moduleRemoved(oldModule.name) as any);
   };
 
   const dynamicStore: DynamicStore<State, ActionType, MiddlewareType> =
@@ -254,14 +292,14 @@ const useDynamicStore = () => {
   return store;
 };
 
-export const useModule = (dynamicModule: Module) => {
+export const useModule = (dynamicModule: ModuleWithWatcher) => {
   if (!dynamicModule) {
     throw new Error(
       "Expected parameter `dynamicModule` of `useModule` to be provided"
     );
   }
   const store = useDynamicStore();
-  const previousModule = useRef<Module>(dynamicModule);
+  const previousModule = useRef<ModuleWithWatcher>(dynamicModule);
 
   const { addModule, removeModule } = store;
 
