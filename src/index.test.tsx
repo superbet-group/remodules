@@ -2,7 +2,7 @@ import * as React from "react";
 import { useCallback, useReducer } from "react";
 import { AnyAction, createStore, PayloadAction } from "@reduxjs/toolkit";
 import { Provider, useDispatch, useSelector } from "react-redux";
-import { put, take } from "redux-saga/effects";
+import { call, put, select, take } from "redux-saga/effects";
 import { fireEvent, render } from "@testing-library/react";
 
 import "@testing-library/jest-dom";
@@ -235,6 +235,48 @@ describe("redux dynamic modules", () => {
     fireEvent.click(mountButton);
 
     expect(store.getState().test).toBeDefined();
+  });
+
+  it("should be able to access store from saga right away", () => {
+    const store = createDynamicStore({
+      reducer: (state = {}) => state,
+    });
+
+    const check = jest.fn();
+
+    const sagaSelect = createModule({
+      name: "sagaSelect",
+      initialState: {
+        value: 0,
+      },
+      reducers: {},
+      selectors: {
+        value: (state) => state.value,
+      },
+    }).withWatcher(({selectors}) => {
+      return function* saga() {
+        const value = yield select(selectors.value);
+        yield call(check, value);
+      };
+    });
+
+    const SagaSelectComponent = () => {
+      useModule(sagaSelect);
+      return null;
+    }
+
+    const TestApp = () => {
+      return (
+        <Provider store={store}>
+          <SagaSelectComponent />
+        </Provider>
+      );
+    }
+
+    render(<TestApp />);
+
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(check).toHaveBeenCalledWith(0);
   });
 
   it("should be able to keep track of modules between re-renders", () => {
