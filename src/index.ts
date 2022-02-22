@@ -242,10 +242,10 @@ export const createDynamicStore = <
       return;
     }
     moduleCount.set(newModule, 1);
+    updateReducer();
     if (newModule.watcher) {
       addSaga(newModule.watcher);
     }
-    updateReducer();
     store.dispatch(moduleAdded(newModule.name) as any);
   };
 
