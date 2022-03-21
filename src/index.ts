@@ -1,12 +1,7 @@
 import {
   type Action,
   type AnyAction,
-  combineReducers,
-  configureStore,
   type ConfigureStoreOptions,
-  createAction,
-  createSelector,
-  createSlice,
   type CreateSliceOptions,
   type EnhancedStore,
   type Middleware,
@@ -15,10 +10,19 @@ import {
   type SliceCaseReducers,
   type Store,
 } from "@reduxjs/toolkit";
+import * as toolkitRaw from "@reduxjs/toolkit";
 import { type ThunkMiddlewareFor } from "@reduxjs/toolkit/dist/getDefaultMiddleware";
 import { useEffect, useRef } from "react";
 import { useStore } from "react-redux";
 import createSagaMiddleware, { type Task } from "redux-saga";
+
+const {
+  combineReducers,
+  configureStore,
+  createAction,
+  createSelector,
+  createSlice,
+} = ((toolkitRaw as any).default ?? toolkitRaw) as typeof toolkitRaw;
 
 export type SelectorsShape<State> = { [key: string]: (state: State) => any };
 

@@ -30,7 +30,9 @@
   "author": "Daniel Kovacs <daniel.kovacs@superbet.com>",
   "type": "module",
   "source": "./src/index.ts",
+  "exports": "./dist/index.modern.js",
   "main": "./dist/index.cjs",
+  "module": "./dist/index.module.js",
   "types": "./dist/index.d.ts",
   "unpkg": "./dist/index.umd.js",
   "scripts": {
