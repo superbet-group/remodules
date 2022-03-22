@@ -1,12 +1,7 @@
 import {
   type Action,
   type AnyAction,
-  combineReducers,
-  configureStore,
   type ConfigureStoreOptions,
-  createAction,
-  createSelector,
-  createSlice,
   type CreateSliceOptions,
   type EnhancedStore,
   type Middleware,
@@ -16,9 +11,26 @@ import {
   type Store,
 } from "@reduxjs/toolkit";
 import { type ThunkMiddlewareFor } from "@reduxjs/toolkit/dist/getDefaultMiddleware";
+import { type Task } from "redux-saga";
+import * as reduxToolkit from "@reduxjs/toolkit";
+import reduxSaga from "redux-saga";
 import { useEffect, useRef } from "react";
 import { useStore } from "react-redux";
-import createSagaMiddleware, { type Task } from "redux-saga";
+
+// NOTE: fix legacy require <-> esm import interop
+const {
+  combineReducers,
+  configureStore,
+  createAction,
+  createSelector,
+  createSlice,
+} = ((reduxToolkit as any).default ?? reduxToolkit) as typeof reduxToolkit;
+const createSagaMiddleware = (
+  typeof (reduxSaga as any).default === "function"
+    ? (reduxSaga as any).default
+    : reduxSaga
+) as typeof reduxSaga;
+// END: fix legacy require <-> esm import interop
 
 export type SelectorsShape<State> = { [key: string]: (state: State) => any };
 
