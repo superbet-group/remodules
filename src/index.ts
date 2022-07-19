@@ -182,7 +182,10 @@ export const createDynamicStore = <
 
   const sagaMiddleware = createSagaMiddleware();
 
-  const originalReducerWithBase = (state: State, action: ActionType) => {
+  const originalReducerWithBase = (
+    state: State | undefined,
+    action: ActionType
+  ) => {
     return baseReducer(originalReducer(state, action), action);
   };
 
@@ -263,7 +266,7 @@ export const createDynamicStore = <
 
   const removeModule = (oldModule: ModuleWithWatcher) => {
     const count = moduleCount.get(oldModule);
-    if (count !== 1) {
+    if (count && count !== 1) {
       moduleCount.set(oldModule, count - 1);
       return;
     }
@@ -310,7 +313,7 @@ export const useModule = (dynamicModule: ModuleWithWatcher) => {
     );
   }
   const store = useDynamicStore();
-  const previousModule = useRef<ModuleWithWatcher>(null);
+  const previousModule = useRef<ModuleWithWatcher | null>(null);
 
   const { addModule, removeModule } = store;
 
